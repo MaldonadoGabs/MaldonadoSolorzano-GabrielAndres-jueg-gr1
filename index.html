@@ -1,263 +1,323 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Demo Plataformero Medieval 2D</title>
-    <!-- Cargamos la librería de Phaser 3 -->
-    <script src="https://cdn.jsdelivr.net/npm/phaser@3.55.2/dist/phaser.min.js"></script>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <style>
-        body {
-            margin: 0;
-            padding: 0;
-            background-color: #1a202c; /* Fondo oscuro fuera del juego */
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-            align-items: center;
-            height: 100vh;
-            color: white;
-            font-family: 'Inter', sans-serif;
-        }
-        #game-container {
-            border: 4px solid #4a5568;
-            border-radius: 8px;
-            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5);
-            overflow: hidden;
-        }
-    </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Demo Medieval - Plataformero 2D</title>
+<style>
+  html, body { margin: 0; height: 100%; background: #1a1410; overflow: hidden; }
+  body { display: flex; justify-content: center; align-items: center; }
+</style>
+<script src="https://cdn.jsdelivr.net/npm/phaser@3.80.1/dist/phaser.min.js"></script>
 </head>
 <body>
+<script>
+const W = 960, H = 540;
+const GROUND_H = 40;
 
-    <div class="mb-4 text-center">
-        <h1 class="text-2xl font-bold text-yellow-500 mb-2">Prototipo Medieval</h1>
-        <p class="text-sm text-gray-300"><b>Controles:</b> Flechas Izquierda/Derecha (Mover) | Flecha Arriba (Saltar) | Barra Espaciadora (Atacar)</p>
-    </div>
+class MainScene extends Phaser.Scene {
+  constructor() { super('main'); }
 
-    <div id="game-container"></div>
+  // ---------- Texturas generadas por código ----------
+  makeTextures() {
+    if (this.textures.exists('knight')) return;
+    const g = this.make.graphics({ x: 0, y: 0, add: false });
 
-    <script>
-        // Escena principal del juego
-        class MainScene extends Phaser.Scene {
-            constructor() {
-                super('MainScene');
-                this.isAttacking = false;
-                this.facingRight = true;
-            }
+    // Caballero (24x40)
+    g.fillStyle(0x444444).fillRect(6, 30, 5, 10).fillRect(13, 30, 5, 10);   // piernas
+    g.fillStyle(0x9aa3ad).fillRect(4, 14, 16, 18);                          // armadura
+    g.fillStyle(0xb02a2a).fillRect(8, 16, 8, 14);                           // tabardo
+    g.fillStyle(0xb8c0c8).fillRect(5, 2, 14, 13);                           // yelmo
+    g.fillStyle(0x222222).fillRect(11, 7, 8, 3);                            // visor
+    g.fillStyle(0xcc2222).fillRect(10, 0, 5, 3);                            // penacho
+    g.generateTexture('knight', 24, 40);
+    g.clear();
 
-            // Generamos las texturas con código para no depender de imágenes externas
-            preload() {
-                // 1. Textura del Caballero (Jugador)
-                const pGraphics = this.add.graphics();
-                // Cuerpo principal (Azul)
-                pGraphics.fillStyle(0x2b6cb0, 1);
-                pGraphics.fillRect(0, 0, 32, 48);
-                // Visor del casco (Gris/Plata)
-                pGraphics.fillStyle(0xccd0d5, 1);
-                pGraphics.fillRect(16, 8, 16, 10);
-                // Pluma del casco (Rojo)
-                pGraphics.fillStyle(0xc53030, 1);
-                pGraphics.fillRect(8, -8, 10, 8);
-                pGraphics.generateTexture('knight', 32, 48);
-                pGraphics.destroy();
+    // Enemigo (24x40)
+    g.fillStyle(0x2b2b2b).fillRect(6, 30, 5, 10).fillRect(13, 30, 5, 10);
+    g.fillStyle(0x5a2d4a).fillRect(4, 14, 16, 18);
+    g.fillStyle(0x3a1a30).fillRect(8, 16, 8, 14);
+    g.fillStyle(0x3b3b3b).fillRect(5, 2, 14, 13);
+    g.fillStyle(0xff3333).fillRect(12, 7, 6, 2);
+    g.generateTexture('enemy', 24, 40);
+    g.clear();
 
-                // 2. Textura de la Espada
-                const sGraphics = this.add.graphics();
-                // Mango (Marrón)
-                sGraphics.fillStyle(0x8B4513, 1);
-                sGraphics.fillRect(0, 5, 10, 6);
-                // Guarda (Dorado)
-                sGraphics.fillStyle(0xD69E2E, 1);
-                sGraphics.fillRect(10, 0, 4, 16);
-                // Hoja de la espada (Plata)
-                sGraphics.fillStyle(0xE2E8F0, 1);
-                sGraphics.fillRect(14, 4, 30, 8);
-                sGraphics.generateTexture('sword', 44, 16);
-                sGraphics.destroy();
+    // Espada (40x8): hoja, guarda y empuñadura
+    g.fillStyle(0xe8eef5).fillRect(10, 2, 30, 4);
+    g.fillStyle(0xffffff).fillRect(10, 2, 30, 1);
+    g.fillStyle(0xc9a227).fillRect(7, 0, 4, 8);
+    g.fillStyle(0x6b3f1d).fillRect(0, 2, 7, 4);
+    g.generateTexture('sword', 40, 8);
+    g.clear();
 
-                // 3. Textura de la Plataforma
-                const platGraphics = this.add.graphics();
-                // Tierra (Marrón)
-                platGraphics.fillStyle(0x744210, 1); 
-                platGraphics.fillRect(0, 0, 200, 32);
-                // Césped (Verde)
-                platGraphics.fillStyle(0x38A169, 1);
-                platGraphics.fillRect(0, 0, 200, 8);
-                platGraphics.generateTexture('platform', 200, 32);
-                platGraphics.destroy();
+    // Suelo (64x40)
+    g.fillStyle(0x5a3d22).fillRect(0, 0, 64, 40);
+    g.fillStyle(0x3f8f3a).fillRect(0, 0, 64, 8);
+    g.fillStyle(0x45301b).fillRect(10, 20, 6, 4).fillRect(40, 28, 8, 4).fillRect(26, 14, 5, 3);
+    g.generateTexture('ground', 64, 40);
+    g.clear();
 
-                // 4. Textura del Enemigo (Rojo)
-                const eGraphics = this.add.graphics();
-                eGraphics.fillStyle(0xe53e3e, 1);
-                eGraphics.fillRect(0, 0, 32, 48);
-                // Ojos
-                eGraphics.fillStyle(0x000000, 1);
-                eGraphics.fillRect(8, 10, 4, 4);
-                eGraphics.fillRect(20, 10, 4, 4);
-                eGraphics.generateTexture('enemy', 32, 48);
-                eGraphics.destroy();
-            }
+    // Plataforma de piedra (32x16)
+    g.fillStyle(0x7b7b86).fillRect(0, 0, 32, 16);
+    g.fillStyle(0x9a9aa6).fillRect(0, 0, 32, 3);
+    g.fillStyle(0x55555e).fillRect(0, 15, 32, 1).fillRect(15, 3, 1, 12);
+    g.generateTexture('plat', 32, 16);
+    g.destroy();
+  }
 
-            create() {
-                // Fondo azul cielo
-                this.cameras.main.setBackgroundColor('#87CEEB');
+  // ---------- Fondo: cielo, montañas, castillo ----------
+  makeBackground() {
+    const g = this.add.graphics().setDepth(-10);
+    g.fillGradientStyle(0x6fb1e8, 0x6fb1e8, 0xf3d9a4, 0xf3d9a4, 1);
+    g.fillRect(0, 0, W, H);
 
-                // --- FÍSICAS Y ENTORNO ---
-                this.platforms = this.physics.add.staticGroup();
+    g.fillStyle(0xffffff, 0.8);
+    [[120, 80, 90], [420, 55, 110], [760, 100, 80]].forEach(([x, y, w]) => {
+      g.fillEllipse(x, y, w, 28).fillEllipse(x + 25, y - 10, w * 0.6, 26);
+    });
 
-                // Crear el suelo
-                for(let i = 0; i < 5; i++) {
-                    this.platforms.create(100 + (i * 200), 584, 'platform');
-                }
+    g.fillStyle(0x7d8fa8);
+    g.fillTriangle(-50, H - GROUND_H, 200, 250, 450, H - GROUND_H);
+    g.fillTriangle(250, H - GROUND_H, 520, 210, 800, H - GROUND_H);
+    g.fillTriangle(600, H - GROUND_H, 850, 270, 1100, H - GROUND_H);
 
-                // Crear algunas plataformas flotantes más bajas y accesibles
-                this.platforms.create(600, 480, 'platform');
-                this.platforms.create(200, 400, 'platform');
-                this.platforms.create(750, 300, 'platform');
+    // Castillo lejano
+    g.fillStyle(0x4a4f63);
+    const base = H - GROUND_H;
+    g.fillRect(690, base - 150, 200, 150);
+    g.fillRect(670, base - 220, 50, 220);
+    g.fillRect(860, base - 220, 50, 220);
+    for (let x = 670; x < 910; x += 16) {
+      if ((x - 670) % 32 === 0) g.fillRect(x, base - 236, 12, 16);
+    }
+    for (let x = 690; x < 890; x += 20) {
+      if ((x - 690) % 40 === 0) g.fillRect(x, base - 166, 14, 16);
+    }
+    g.fillStyle(0x23252f).fillRect(770, base - 70, 40, 70);
+    g.fillStyle(0xf2c94c).fillRect(688, base - 190, 6, 14).fillRect(878, base - 190, 6, 14);
+  }
 
-                // --- JUGADOR ---
-                this.player = this.physics.add.sprite(100, 400, 'knight');
-                this.player.setBounce(0.1);
-                this.player.setCollideWorldBounds(true);
-                // Ajustar hit-box para que coincida mejor con el cuerpo
-                this.player.body.setSize(32, 48);
-                this.player.body.setOffset(0, 0);
+  create() {
+    this.over = false;
+    this.score = 0;
+    this.hp = 5;
+    this.facing = 1;
+    this.attacking = false;
+    this.swing = -20;
+    this.swingId = 0;
+    this.invulUntil = 0;
+    this.stunUntil = 0;
 
-                // --- ESPADA ---
-                this.sword = this.add.sprite(this.player.x, this.player.y, 'sword');
-                // Colocamos el origen en el mango (extremo izquierdo)
-                this.sword.setOrigin(0, 0.5);
-                this.sword.setAngle(-60); // Posición de reposo apuntando hacia arriba/adelante
+    this.makeTextures();
+    this.makeBackground();
 
-                // Añadimos colisiones
-                this.physics.add.collider(this.player, this.platforms);
+    // Plataformas (más bajas: ~80px entre niveles, el salto llega a ~150px)
+    this.platforms = this.physics.add.staticGroup();
+    const ground = this.add.tileSprite(W / 2, H - GROUND_H / 2, W, GROUND_H, 'ground');
+    this.platforms.add(ground);
 
-                // --- ENEMIGOS ---
-                this.enemies = this.physics.add.group();
-                this.physics.add.collider(this.enemies, this.platforms);
+    [[150, 420, 160], [400, 340, 160], [680, 420, 160], [860, 340, 120], [600, 260, 140]]
+      .forEach(([x, y, w]) => {
+        const p = this.add.tileSprite(x, y, w, 16, 'plat');
+        this.platforms.add(p);
+        // Plataformas "de un solo sentido": se pueden atravesar saltando desde abajo
+        p.body.checkCollision.down = false;
+        p.body.checkCollision.left = false;
+        p.body.checkCollision.right = false;
+      });
 
-                // Generador de enemigos (cada 3 segundos)
-                this.time.addEvent({
-                    delay: 3000,
-                    callback: this.spawnEnemy,
-                    callbackScope: this,
-                    loop: true
-                });
+    // Jugador
+    this.player = this.physics.add.sprite(100, 400, 'knight');
+    this.player.setCollideWorldBounds(true).setDepth(5);
+    this.physics.add.collider(this.player, this.platforms);
 
-                // --- CONTROLES ---
-                this.cursors = this.input.keyboard.createCursorKeys();
-                this.spaceKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE);
-            }
+    this.sword = this.add.image(0, 0, 'sword').setOrigin(0, 0.5).setDepth(6);
 
-            update() {
-                // Lógica de Movimiento Horizontal
-                if (this.cursors.left.isDown) {
-                    this.player.setVelocityX(-200);
-                    this.player.flipX = true;
-                    this.facingRight = false;
-                } 
-                else if (this.cursors.right.isDown) {
-                    this.player.setVelocityX(200);
-                    this.player.flipX = false;
-                    this.facingRight = true;
-                } 
-                else {
-                    this.player.setVelocityX(0);
-                }
+    // Enemigos
+    this.enemies = this.physics.add.group();
+    this.physics.add.collider(this.enemies, this.platforms);
+    this.physics.add.overlap(this.player, this.enemies, (pl, en) => this.onPlayerHit(en));
+    this.scheduleSpawn();
 
-                // Lógica de Salto
-                if (this.cursors.up.isDown && this.player.body.touching.down) {
-                    this.player.setVelocityY(-500);
-                }
+    // Controles
+    this.cursors = this.input.keyboard.createCursorKeys();
+    this.keys = this.input.keyboard.addKeys('W,A,D,SPACE,J,X,Z,R');
+    this.input.on('pointerdown', () => {
+      if (this.over) this.scene.restart();
+      else this.attack();
+    });
 
-                // Lógica de la Posición de la Espada
-                // Hacemos que la espada siga al jugador (simulando que la tiene en la mano)
-                let swordOffsetX = this.facingRight ? 10 : -10;
-                this.sword.setPosition(this.player.x + swordOffsetX, this.player.y + 5);
-                
-                // Volteamos la espada dependiendo de hacia dónde mira el jugador
-                this.sword.scaleX = this.facingRight ? 1 : -1;
+    // HUD
+    this.hud = this.add.text(16, 12, '', {
+      fontFamily: 'Georgia, serif', fontSize: '22px', color: '#fff',
+      stroke: '#2a1a0a', strokeThickness: 4
+    }).setDepth(20);
+    this.add.text(W - 16, 12,
+      '← → / A D: mover   ↑ / W / Espacio: saltar   J / X / clic: atacar', {
+      fontFamily: 'Georgia, serif', fontSize: '14px', color: '#fff',
+      stroke: '#2a1a0a', strokeThickness: 3
+    }).setOrigin(1, 0).setDepth(20);
+    this.updateHud();
+  }
 
-                // Lógica de Ataque
-                if (Phaser.Input.Keyboard.JustDown(this.spaceKey) && !this.isAttacking) {
-                    this.attack();
-                }
+  updateHud() {
+    this.hud.setText('♥'.repeat(Math.max(this.hp, 0)) + '   Puntos: ' + this.score);
+  }
 
-                // Lógica de los Enemigos (moverse hacia el jugador)
-                this.enemies.getChildren().forEach(enemy => {
-                    if (enemy.x < this.player.x - 15) {
-                        enemy.setVelocityX(60);
-                    } else if (enemy.x > this.player.x + 15) {
-                        enemy.setVelocityX(-60);
-                    } else {
-                        enemy.setVelocityX(0);
-                    }
-                });
+  // ---------- Enemigos ----------
+  scheduleSpawn() {
+    this.time.delayedCall(Math.max(900, 2400 - this.score * 5), () => {
+      if (this.over) return;
+      if (this.enemies.countActive() < 8) this.spawnEnemy();
+      this.scheduleSpawn();
+    });
+  }
 
-                // Comprobar colisiones de ataque si la espada está en movimiento
-                if (this.isAttacking) {
-                    this.checkHit();
-                }
-            }
+  spawnEnemy() {
+    const x = Math.random() < 0.5 ? 30 : W - 30;
+    const e = this.enemies.create(x, 100, 'enemy');
+    e.setCollideWorldBounds(true).setDepth(4);
+    e.hp = 2;
+    e.speed = Phaser.Math.Between(50, 95);
+    e.stunUntil = 0;
+    e.nextJump = 0;
+    e.hitId = -1;
+  }
 
-            spawnEnemy() {
-                // Aparecen de forma aleatoria a la izquierda o derecha en la parte superior
-                let spawnX = (Math.random() > 0.5) ? 50 : 750;
-                let enemy = this.enemies.create(spawnX, 100, 'enemy');
-                enemy.setBounce(0.2);
-                enemy.setCollideWorldBounds(true);
-            }
+  onPlayerHit(en) {
+    const now = this.time.now;
+    if (this.over || now < this.invulUntil || now < en.stunUntil) return;
+    this.hp--;
+    this.invulUntil = now + 1000;
+    this.stunUntil = now + 250;
+    const dir = Math.sign(this.player.x - en.x) || 1;
+    this.player.setVelocity(dir * 300, -250);
+    this.tweens.add({
+      targets: this.player, alpha: 0.3, yoyo: true, repeat: 4, duration: 100,
+      onComplete: () => this.player.setAlpha(1)
+    });
+    this.updateHud();
+    if (this.hp <= 0) this.gameOver();
+  }
 
-            checkHit() {
-                // Calculamos el área de impacto enfrente del jugador
-                let hitAreaX = this.facingRight ? this.player.x + 35 : this.player.x - 35;
-                let hitAreaY = this.player.y;
+  // ---------- Ataque con espada ----------
+  attack() {
+    if (this.over || this.attacking) return;
+    this.attacking = true;
+    this.swingId++;
+    this.tweens.addCounter({
+      from: -80, to: 60, duration: 180,
+      onUpdate: t => { this.swing = t.getValue(); },
+      onComplete: () => {
+        this.attacking = false;
+        this.swing = -20;
+      }
+    });
+  }
 
-                this.enemies.getChildren().forEach(enemy => {
-                    // Si el enemigo está dentro del rango del espadazo
-                    if (Phaser.Math.Distance.Between(hitAreaX, hitAreaY, enemy.x, enemy.y) < 45) {
-                        enemy.destroy();
-                    }
-                });
-            }
+  damageEnemy(e) {
+    e.hitId = this.swingId;
+    e.hp--;
+    e.stunUntil = this.time.now + 300;
+    e.setVelocity(this.facing * 260, -160);
+    e.setTint(0xffffff);
+    this.time.delayedCall(100, () => e.active && e.clearTint());
+    if (e.hp <= 0) {
+      this.score += 10;
+      this.updateHud();
+      const t = this.add.text(e.x, e.y - 20, '+10', {
+        fontFamily: 'Georgia, serif', fontSize: '20px', color: '#ffd84a',
+        stroke: '#000', strokeThickness: 3
+      }).setOrigin(0.5).setDepth(20);
+      this.tweens.add({
+        targets: t, y: t.y - 35, alpha: 0, duration: 700,
+        onComplete: () => t.destroy()
+      });
+      e.destroy();
+    }
+  }
 
-            attack() {
-                this.isAttacking = true;
-                
-                // Animación simple de rotación para simular el ataque
-                this.tweens.add({
-                    targets: this.sword,
-                    angle: 90, // Gira hacia abajo
-                    duration: 120, // Velocidad del espadazo (ms)
-                    yoyo: true, // Vuelve a la posición original
-                    ease: 'Sine.easeInOut',
-                    onComplete: () => {
-                        this.isAttacking = false;
-                        this.sword.setAngle(-60); // Aseguramos el ángulo de reposo
-                    }
-                });
-            }
+  gameOver() {
+    this.over = true;
+    this.physics.pause();
+    this.sword.setVisible(false);
+    this.add.rectangle(W / 2, H / 2, W, H, 0x000000, 0.6).setDepth(30);
+    this.add.text(W / 2, H / 2 - 30, 'Has caído en batalla', {
+      fontFamily: 'Georgia, serif', fontSize: '48px', color: '#ffd84a',
+      stroke: '#000', strokeThickness: 6
+    }).setOrigin(0.5).setDepth(31);
+    this.add.text(W / 2, H / 2 + 30, 'Puntos: ' + this.score + '   —   R o clic para reiniciar', {
+      fontFamily: 'Georgia, serif', fontSize: '22px', color: '#fff'
+    }).setOrigin(0.5).setDepth(31);
+  }
+
+  // ---------- Bucle principal ----------
+  update(time) {
+    if (this.over) {
+      if (Phaser.Input.Keyboard.JustDown(this.keys.R)) this.scene.restart();
+      return;
+    }
+    const p = this.player, k = this.keys, c = this.cursors;
+
+    // Movimiento
+    if (time >= this.stunUntil) {
+      const left = c.left.isDown || k.A.isDown;
+      const right = c.right.isDown || k.D.isDown;
+      if (left) { p.setVelocityX(-200); this.facing = -1; }
+      else if (right) { p.setVelocityX(200); this.facing = 1; }
+      else p.setVelocityX(0);
+    }
+    p.setFlipX(this.facing < 0);
+
+    // Salto
+    const onFloor = p.body.blocked.down || p.body.touching.down;
+    if ((Phaser.Input.Keyboard.JustDown(c.up) || Phaser.Input.Keyboard.JustDown(k.W) ||
+         Phaser.Input.Keyboard.JustDown(k.SPACE)) && onFloor) {
+      p.setVelocityY(-520);
+    }
+
+    // Ataque
+    if (Phaser.Input.Keyboard.JustDown(k.J) || Phaser.Input.Keyboard.JustDown(k.X) ||
+        Phaser.Input.Keyboard.JustDown(k.Z)) this.attack();
+
+    // Espada sigue al jugador
+    this.sword.setPosition(p.x + this.facing * 6, p.y + 2);
+    this.sword.setScale(this.facing, 1);
+    this.sword.setAngle(this.facing * this.swing);
+
+    // Enemigos
+    this.enemies.getChildren().slice().forEach(e => {
+      // Daño de la espada (solo una vez por golpe)
+      if (this.attacking && e.hitId !== this.swingId) {
+        const dx = (e.x - p.x) * this.facing;
+        if (dx > -10 && dx < 70 && Math.abs(e.y - p.y) < 40) {
+          this.damageEnemy(e);
+          return;
         }
+      }
+      // IA muy simple: caminar hacia el jugador y saltar si está más arriba
+      if (time >= e.stunUntil) {
+        const dir = Math.sign(p.x - e.x);
+        e.setVelocityX(dir * e.speed);
+        e.setFlipX(dir < 0);
+        if (p.y < e.y - 70 && (e.body.blocked.down || e.body.touching.down) && time > e.nextJump) {
+          e.setVelocityY(-520);
+          e.nextJump = time + 1500;
+        }
+      }
+    });
+  }
+}
 
-        // Configuración de Phaser
-        const config = {
-            type: Phaser.AUTO,
-            width: 800,
-            height: 600,
-            parent: 'game-container', // Lo inyectamos en nuestro div estilizado
-            physics: {
-                default: 'arcade',
-                arcade: {
-                    gravity: { y: 1000 }, // Gravedad estilo plataforma (rápida)
-                    debug: false
-                }
-            },
-            scene: MainScene
-        };
-
-        // Inicializar el juego
-        const game = new Phaser.Game(config);
-    </script>
+new Phaser.Game({
+  type: Phaser.AUTO,
+  width: W,
+  height: H,
+  backgroundColor: '#6fb1e8',
+  physics: { default: 'arcade', arcade: { gravity: { y: 900 }, debug: false } },
+  scale: { mode: Phaser.Scale.FIT, autoCenter: Phaser.Scale.CENTER_BOTH },
+  scene: MainScene
+});
+</script>
 </body>
 </html>
